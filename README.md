@@ -39,6 +39,8 @@ import { Board, BoardProvider, WriteAboutButton } from 'board-kit/web';
   <WriteAboutButton onCreated={(id) => navigate(`/board/${id}`)} />   {/* 어느 화면 머리에든 */}
 </BoardProvider>
 ```
+첨부 올리기 · 가져오기는 요청 본문을 **스트림으로 그대로** 읽는다 — 호스트에 JSON 본문 파서가 먼저 돌면 그 두 경로는 제외한다(NestJS 기본 body-parser 는 `application/octet-stream` 을 건너뛰므로 보통 그대로 된다).
+
 Tailwind 가 이 패키지의 소스를 읽어야 한다 — 호스트 CSS 에 `@source "../../node_modules/board-kit/src/web";` 한 줄. 색은 shadcn 식 토큰(`bg-background` · `text-muted-foreground` · `border` · `bg-primary` …)만 쓴다.
 
 ## 구조

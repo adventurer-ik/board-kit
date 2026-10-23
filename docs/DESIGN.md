@@ -43,3 +43,4 @@ JSONL — 첫 줄 머리(`kind: board-kit`), 그 뒤 글 한 줄(댓글 · 반�
 - [ ] 초기화 범위에서 **빼기** — 지우려면 `BoardService.wipe()` 를 명시적 옵션으로
 - [ ] 상태 화면에 파일 크기 한 줄(선택) · CLI 내보내기/가져오기(선택)
 - [ ] Tailwind `@source` 한 줄 · 토큰 이름 맞추기
+- [ ] 호스트에 **본문을 미리 읽는 미들웨어**(JSON 파서)가 있으면 첨부 올리기(`POST …/posts/:id/attachments` · `…/comments/:id/attachments`)와 `POST …/import` 를 **제외** — 패키지는 요청 스트림을 그대로 읽는다
