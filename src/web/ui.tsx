@@ -59,8 +59,12 @@ export function Chip({ on, children, onClick }: { on: boolean; children: ReactNo
   );
 }
 
-/** 창 — 바탕 누르면 닫힘, Esc 로 닫힘 */
-export function Dialog({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+/**
+ * 창 — 바탕 누르면 닫힘, Esc 로 닫힘.
+ * size: md(확인 창) · lg(짧은 입력) · xl(글 쓰기 — 화면 폭의 대부분, 긴 본문을 편하게)
+ */
+export function Dialog({ open, onClose, title, children, footer, wide, size }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean; size?: 'md' | 'lg' | 'xl' }) {
+  const sz = size ?? (wide ? 'lg' : 'md');
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -69,8 +73,8 @@ export function Dialog({ open, onClose, title, children, footer, wide }: { open:
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 pt-12" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={cn('w-full rounded-xl border bg-background text-foreground shadow-2xl', wide ? 'max-w-3xl' : 'max-w-xl')}>
+    <div className={cn('fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4', sz === 'xl' ? 'pt-6' : 'pt-12')} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={cn('w-full rounded-xl border bg-background text-foreground shadow-2xl', sz === 'xl' ? 'max-w-6xl' : sz === 'lg' ? 'max-w-3xl' : 'max-w-xl')}>
         <div className="flex items-center justify-between px-5 pt-4">
           <h2 className="text-lg font-semibold">{title}</h2>
           <Button variant="ghost" size="icon" aria-label="close" onClick={onClose}>

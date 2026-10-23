@@ -32,7 +32,7 @@ export function PostDetail({ id, onBack, onDeleted }: PostProps) {
 
   const p = post.data;
   return (
-    <div className="flex max-w-4xl flex-col gap-5">
+    <div className="flex w-full flex-col gap-5">
       <button type="button" onClick={onBack} className="inline-flex w-fit cursor-pointer items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="size-4" />
         {t('back')}

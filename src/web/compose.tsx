@@ -76,7 +76,7 @@ export function ComposeDialog(p: ComposeProps) {
       open={p.open}
       onClose={p.onClose}
       title={p.title ?? (p.post ? t('edit') : t('write'))}
-      wide
+      size="xl"
       footer={
         <>
           <Button onClick={p.onClose}>{t('cancel')}</Button>
@@ -122,7 +122,8 @@ export function ComposeDialog(p: ComposeProps) {
           <Label htmlFor="bk-body">{t('fBody')}</Label>
           <CodeInsert textarea={bodyRef} value={body} onChange={setBody} />
         </div>
-        <Textarea id="bk-body" ref={bodyRef} value={body} maxLength={20_000} onChange={(e) => setBody(e.target.value)} className="min-h-44 font-[inherit]" />
+        {/* 긴 본문 · 코드를 편하게 — 화면 높이의 절반쯤, 글자는 본문과 같은 15px */}
+        <Textarea id="bk-body" ref={bodyRef} value={body} maxLength={20_000} onChange={(e) => setBody(e.target.value)} className="min-h-[46vh] font-[inherit] text-[15px] leading-7" />
         <p className="m-0 text-xs text-muted-foreground">{t('bodyHint')}</p>
       </div>
       <AttachPicker pending={pending} rule={cfg.data?.attach ?? null} existing={p.post?.attachmentList.length ?? 0} />
