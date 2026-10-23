@@ -73,7 +73,7 @@ export class BoardService {
     const p = this.live(id);
     const reactedBy = this.repo.reactedBy(id);
     const atts = this.repo.attachmentsOfPost(id);
-    const comments = this.repo.comments(id).map((c) => commentView(c, atts.filter((a) => a.owner_kind === 'comment' && a.owner_id === c.id), actor));
+    const comments = this.repo.comments(id).map((c) => commentView(c, atts.filter((a) => a.owner_kind === 'comment' && a.owner_id === c.id), actor, p.author));
     return {
       ...summary(p),
       body: p.body,
@@ -83,7 +83,7 @@ export class BoardService {
       reactedBy,
       attachmentList: atts.filter((a) => a.owner_kind === 'post').map(attachmentView),
       commentList: comments,
-      canEdit: p.author === actor.name && !p.closed_at,
+      canEdit: p.author === actor.name, // 완료는 표시일 뿐 — 글쓴이는 언제든 고친다(뒤에 정보를 더할 수 있게)
       canClose: p.author === actor.name || actor.moderator,
       canDelete: p.author === actor.name || actor.moderator,
     };
@@ -100,7 +100,6 @@ export class BoardService {
   update(id: number, input: PostInput, actor: Actor): PostView {
     const p = this.live(id);
     if (p.author !== actor.name) throw new BoardError('BOARD_FORBIDDEN');
-    if (p.closed_at) throw new BoardError('BOARD_CLOSED');
     const v = this.validatePost(input);
     this.repo.updatePost(id, v);
     this.emit('post.updated', actor, { postId: id, title: v.title, postAuthor: p.author });
@@ -123,13 +122,14 @@ export class BoardService {
   }
 
   // ── 댓글 ──
-  addComment(postId: number, body: string, actor: Actor): CommentView {
+  /** 댓글 — `priv` 면 비밀 댓글(글쓴이 · 쓴 사람 · 운영자만 본문을 본다). 완료 글에도 단다 */
+  addComment(postId: number, body: string, actor: Actor, priv = false): CommentView {
     const p = this.live(postId);
     const b = (body ?? '').trim();
     if (!b || b.length > LIMITS.comment) throw new BoardError('BOARD_INVALID', { field: 'body', max: LIMITS.comment });
-    const id = this.repo.insertComment(postId, b, actor.name);
-    this.emit('comment.created', actor, { postId, commentId: id, title: p.title, postAuthor: p.author });
-    return commentView(this.repo.comment(id)!, [], actor);
+    const id = this.repo.insertComment(postId, b, actor.name, priv);
+    this.emit('comment.created', actor, { postId, commentId: id, title: p.title, postAuthor: p.author, private: priv });
+    return commentView(this.repo.comment(id)!, [], actor, p.author);
   }
 
   removeComment(id: number, actor: Actor): void {
@@ -182,11 +182,14 @@ export class BoardService {
   }
 
   /** 내려주기 — 어댑터가 파일을 흘린다. inline 그림만 그림 MIME, 나머지는 받기(attachment) */
-  openAttachment(id: number): { abs: string; row: AttachmentRow; disposition: 'inline' | 'attachment' } {
+  openAttachment(id: number, actor: Actor): { abs: string; row: AttachmentRow; disposition: 'inline' | 'attachment' } {
     const a = this.repo.attachment(id);
     if (!a || a.deleted_at || !this.store) throw new BoardError('BOARD_NOT_FOUND');
-    const post = a.owner_kind === 'post' ? this.repo.post(a.owner_id) : this.repo.post(this.repo.comment(a.owner_id)?.post_id ?? -1);
+    const comment = a.owner_kind === 'comment' ? this.repo.comment(a.owner_id) : undefined;
+    const post = a.owner_kind === 'post' ? this.repo.post(a.owner_id) : this.repo.post(comment?.post_id ?? -1);
     if (!post || post.deleted_at) throw new BoardError('BOARD_NOT_FOUND');
+    // 비밀 댓글의 첨부는 본문과 같은 사람에게만 — 남에게는 없는 것처럼
+    if (comment && !canSeeComment(comment, actor, post.author)) throw new BoardError('BOARD_NOT_FOUND');
     const inline = a.display === 'inline' && INLINE_KINDS.includes(a.kind);
     return { abs: this.store.abs(a.path), row: a, disposition: inline ? 'inline' : 'attachment' };
   }
@@ -230,7 +233,7 @@ export class BoardService {
         out.posts++;
         for (const a of (o['attachments'] as Record<string, unknown>[] | undefined) ?? []) out.attachments += this.importAttachment('post', id, a, out);
         for (const c of (o['comments'] as Record<string, unknown>[] | undefined) ?? []) {
-          const cid = this.repo.insertComment(id, String(c['body']), String(c['author']));
+          const cid = this.repo.insertComment(id, String(c['body']), String(c['author']), Boolean(c['private']));
           this.copyTimes('comment', cid, c);
           out.comments++;
           for (const a of (c['attachments'] as Record<string, unknown>[] | undefined) ?? []) out.attachments += this.importAttachment('comment', cid, a, out);
@@ -329,8 +332,26 @@ function summary(p: PostRow): PostSummary {
   return { id: p.id, category: p.category, title: p.title, author: p.author, context, createdAt: p.created_at, updatedAt: p.updated_at, closedAt: p.closed_at, comments: p.comments, reactions: p.reactions, attachments: p.attachments };
 }
 
-function commentView(c: CommentRow, atts: AttachmentRow[], actor: Actor): CommentView {
-  return { id: c.id, postId: c.post_id, author: c.author, body: c.body, bodyFormat: 'text', createdAt: c.created_at, attachments: atts.map(attachmentView), canDelete: c.author === actor.name || actor.moderator };
+/** 비밀 댓글을 볼 수 있는 사람 — 글쓴이 · 댓글 쓴 사람 · 운영자 */
+function canSeeComment(c: CommentRow, actor: Actor, postAuthor: string): boolean {
+  return !c.private || c.author === actor.name || postAuthor === actor.name || actor.moderator;
+}
+
+function commentView(c: CommentRow, atts: AttachmentRow[], actor: Actor, postAuthor: string): CommentView {
+  const priv = !!c.private;
+  const visible = canSeeComment(c, actor, postAuthor);
+  return {
+    id: c.id,
+    postId: c.post_id,
+    author: c.author,
+    body: visible ? c.body : '',
+    bodyFormat: 'text',
+    createdAt: c.created_at,
+    attachments: visible ? atts.map(attachmentView) : [],
+    private: priv,
+    hidden: !visible,
+    canDelete: c.author === actor.name || actor.moderator,
+  };
 }
 
 function attachmentView(a: AttachmentRow): AttachmentView {

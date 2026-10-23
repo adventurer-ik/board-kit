@@ -84,14 +84,16 @@ describe('BoardService', () => {
     expect(() => svc.create({ category: 'idea', title: 't', body: 'x'.repeat(20_001) }, kim)).toThrowError(/BOARD_INVALID/);
   });
 
-  it('권한 — 고치기는 글쓴이만 · 닫기 · 지우기는 글쓴이 또는 운영자, 닫힌 글은 못 고친다', () => {
+  it('권한 — 고치기는 글쓴이만 · 완료 · 지우기는 글쓴이 또는 운영자, 완료 글도 글쓴이는 고친다(표시일 뿐)', () => {
     const p = svc.create({ category: 'question', title: 'q', body: 'b' }, kim);
     expect(() => svc.update(p.id, { category: 'question', title: 'q2', body: 'b' }, lee)).toThrowError(/BOARD_FORBIDDEN/);
     expect(() => svc.close(p.id, lee, true)).toThrowError(/BOARD_FORBIDDEN/);
     const closed = svc.close(p.id, root, true);
     expect(closed.closedAt).not.toBeNull();
     expect(closed.closedBy).toBe('root');
-    expect(() => svc.update(p.id, { category: 'question', title: 'q2', body: 'b' }, kim)).toThrowError(/BOARD_CLOSED/);
+    expect(svc.update(p.id, { category: 'question', title: 'q2', body: 'b' }, kim).title).toBe('q2'); // 완료 뒤에도 글쓴이는 고친다
+    expect(svc.get(p.id, kim).canEdit).toBe(true);
+    expect(svc.addComment(p.id, '완료 뒤 댓글', lee).body).toBe('완료 뒤 댓글');
     expect(svc.list({}).total).toBe(0); // 기본 목록은 열린 글
     expect(svc.list({ closed: 'closed' }).total).toBe(1);
     svc.close(p.id, kim, false);
@@ -200,5 +202,33 @@ describe('BoardService', () => {
     expect(v.attachmentList[0]!.display).toBe('inline');
     expect(v.commentList[0]!.attachments).toEqual([]);
     expect(() => svc.importJsonl(['not json'], root)).toThrowError(/BOARD_IMPORT_FORMAT/);
+  });
+  it('비밀 댓글 — 글쓴이 · 쓴 사람 · 운영자만 본문 · 첨부를 본다, 남에게는 있다는 것만', async () => {
+    const p = svc.create({ category: 'question', title: 'q', body: 'b' }, kim);
+    const c = svc.addComment(p.id, '비밀 말', lee, true);
+    expect(c.private).toBe(true);
+    expect(c.hidden).toBe(false);
+    const att = await svc.addAttachment({ kind: 'comment', id: c.id }, Readable.from([PNG]), { name: 'a.png', display: 'file' }, lee);
+    const other = { name: 'park', moderator: false };
+    const seen = (a: typeof kim) => svc.get(p.id, a).commentList[0]!;
+    expect(seen(kim).body).toBe('비밀 말'); // 글쓴이
+    expect(seen(lee).body).toBe('비밀 말'); // 쓴 사람
+    expect(seen(root).body).toBe('비밀 말'); // 운영자
+    const hidden = seen(other);
+    expect(hidden.hidden).toBe(true);
+    expect(hidden.body).toBe('');
+    expect(hidden.attachments).toEqual([]);
+    expect(hidden.author).toBe('lee'); // 쓴 사람은 보인다
+    expect(svc.get(p.id, other).comments).toBe(1); // 수는 센다
+    expect(() => svc.openAttachment(att.id, other)).toThrowError(/BOARD_NOT_FOUND/);
+    expect(svc.openAttachment(att.id, kim).row.id).toBe(att.id);
+    // 내보내기 → 가져오기에도 비밀이 따라간다
+    const lines = [...svc.exportJsonl()];
+    const rec = JSON.parse(lines[1]!) as { comments: { private: number }[] };
+    expect(rec.comments[0]!.private).toBe(1);
+    svc.wipe(root);
+    svc.importJsonl(lines, root);
+    const again = svc.list({ closed: 'all' }).items[0]!;
+    expect(svc.get(again.id, other).commentList[0]!.hidden).toBe(true);
   });
 });

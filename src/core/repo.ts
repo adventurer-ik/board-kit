@@ -9,7 +9,7 @@ export interface PostRow {
   created_at: string; updated_at: string | null; closed_at: string | null; closed_by: string | null; deleted_at: string | null; deleted_by: string | null;
   comments: number; reactions: number; attachments: number;
 }
-export interface CommentRow { id: number; post_id: number; body: string; body_format: string; author: string; created_at: string; deleted_at: string | null }
+export interface CommentRow { id: number; post_id: number; body: string; body_format: string; author: string; private: number; created_at: string; deleted_at: string | null }
 export interface AttachmentRow {
   id: number; owner_kind: 'post' | 'comment'; owner_id: number; name: string; kind: AttachKind; mime: string; bytes: number; sha256: string; display: AttachDisplay; path: string; created_at: string; deleted_at: string | null;
 }
@@ -89,8 +89,8 @@ export class BoardRepo {
   comment(id: number): CommentRow | undefined {
     return this.db.prepare(`SELECT * FROM ${S}.comment WHERE id = ?`).get(id) as CommentRow | undefined;
   }
-  insertComment(postId: number, body: string, author: string): number {
-    return Number(this.db.prepare(`INSERT INTO ${S}.comment (post_id, body, author) VALUES (?, ?, ?)`).run(postId, body, author).lastInsertRowid);
+  insertComment(postId: number, body: string, author: string, priv = false): number {
+    return Number(this.db.prepare(`INSERT INTO ${S}.comment (post_id, body, author, private) VALUES (?, ?, ?, ?)`).run(postId, body, author, priv ? 1 : 0).lastInsertRowid);
   }
   deleteComment(id: number, by: string): void {
     this.db.prepare(`UPDATE ${S}.comment SET deleted_at = ?, deleted_by = ? WHERE id = ?`).run(now(), by, id);
@@ -140,7 +140,7 @@ export class BoardRepo {
     return this.db
       .prepare(
         `SELECT p.*, 0 AS comments, 0 AS reactions, 0 AS attachments,
-           (SELECT json_group_array(json_object('id', c.id, 'body', c.body, 'body_format', c.body_format, 'author', c.author, 'created_at', c.created_at, 'deleted_at', c.deleted_at, 'deleted_by', c.deleted_by,
+           (SELECT json_group_array(json_object('id', c.id, 'body', c.body, 'body_format', c.body_format, 'author', c.author, 'private', c.private, 'created_at', c.created_at, 'deleted_at', c.deleted_at, 'deleted_by', c.deleted_by,
               'attachments', (SELECT json_group_array(json_object('name', a.name, 'kind', a.kind, 'mime', a.mime, 'bytes', a.bytes, 'sha256', a.sha256, 'display', a.display, 'path', a.path, 'created_at', a.created_at))
                               FROM ${S}.attachment a WHERE a.owner_kind = 'comment' AND a.owner_id = c.id AND a.deleted_at IS NULL)))
             FROM ${S}.comment c WHERE c.post_id = p.id ORDER BY c.id) AS comment_list,

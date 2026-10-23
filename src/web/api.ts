@@ -56,7 +56,7 @@ export class BoardApi {
   update = (id: number, b: { category: string; title: string; body: string }) => this.f<PostView>('PUT', `${this.base}/posts/${id}`, b);
   close = (id: number, closed: boolean) => this.f<PostView>('POST', `${this.base}/posts/${id}/close`, { closed });
   remove = (id: number) => this.f<void>('DELETE', `${this.base}/posts/${id}`);
-  comment = (id: number, body: string) => this.f<CommentView>('POST', `${this.base}/posts/${id}/comments`, { body });
+  comment = (id: number, body: string, priv = false) => this.f<CommentView>('POST', `${this.base}/posts/${id}/comments`, { body, private: priv });
   removeComment = (id: number) => this.f<void>('DELETE', `${this.base}/comments/${id}`);
   react = (id: number) => this.f<{ reactions: number; reactedByMe: boolean }>('POST', `${this.base}/posts/${id}/react`);
   attach = (owner: { kind: 'post' | 'comment'; id: number }, file: File, display: AttachDisplay) =>

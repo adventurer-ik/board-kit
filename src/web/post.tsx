@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ThumbsUp } from 'lucide-react';
+import { ChevronLeft, Lock, ThumbsUp } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { CommentView } from '../shared/types';
 import { AttachmentList, AttachPicker, ErrorLine, uploadPending, usePending } from './attachments';
@@ -67,7 +67,7 @@ export function PostDetail({ id, onBack, onDeleted }: PostProps) {
                     {t('edit')}
                   </Button>
                 )}
-                {p.canClose && (
+                {p.canClose && p.category !== 'tip' && ( // 경험(tip) 글에는 "완료" 가 어색하다
                   <Button size="sm" onClick={() => close.mutate(!p.closedAt)} disabled={close.isPending}>
                     {p.closedAt ? t('reopen') : t('close')}
                   </Button>
@@ -104,16 +104,18 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
   const { api, t, formatTime } = useBoard();
   const cfg = useQuery({ queryKey: ['board', 'config'], queryFn: api.config });
   const [body, setBody] = useState('');
+  const [priv, setPriv] = useState(false);
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const pending = usePending(cfg.data?.attach ?? null);
   const add = useMutation({
     mutationFn: async () => {
-      const c = await api.comment(postId, body);
+      const c = await api.comment(postId, body, priv);
       const failed = await uploadPending(api, { kind: 'comment', id: c.id }, pending);
       return failed;
     },
     onSuccess: (failed) => {
       setBody('');
+      setPriv(false);
       if (!failed) pending.reset();
       onChanged();
     },
@@ -128,6 +130,12 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
           <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
             <span className="font-semibold text-foreground">{c.author}</span>
             {c.author === postAuthor && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">{t('author')}</span>}
+            {c.private && (
+              <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 font-semibold text-amber-800 dark:text-amber-300" title={t('commentPrivateHint')}>
+                <Lock className="size-3" />
+                {t('privateBadge')}
+              </span>
+            )}
             <span>{formatTime(c.createdAt)}</span>
             {c.canDelete && (
               <Button variant="ghost" size="sm" className="ml-auto h-6 px-2 text-muted-foreground" onClick={() => window.confirm(t('removeCommentConfirm')) && remove.mutate(c.id)}>
@@ -135,8 +143,14 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
               </Button>
             )}
           </div>
-          <Body text={c.body} className="flex flex-col gap-2 [&_p]:text-sm [&_p]:leading-6" />
-          <AttachmentList items={c.attachments} canRemove={c.canDelete} onRemoved={onChanged} />
+          {c.hidden ? (
+            <p className="m-0 text-sm text-muted-foreground italic">{t('privateHidden')}</p>
+          ) : (
+            <>
+              <Body text={c.body} className="flex flex-col gap-2 [&_p]:text-sm [&_p]:leading-6" />
+              <AttachmentList items={c.attachments} canRemove={c.canDelete} onRemoved={onChanged} />
+            </>
+          )}
         </div>
       ))}
       <div className="mt-1 flex flex-col gap-2">
@@ -149,6 +163,11 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
           <div className="min-w-0 flex-1">
             <AttachPicker pending={pending} rule={cfg.data?.attach ?? null} />
           </div>
+          <label className="flex cursor-pointer items-center gap-1.5 self-end pb-2 text-xs text-muted-foreground" title={t('commentPrivateHint')}>
+            <input type="checkbox" checked={priv} onChange={(e) => setPriv(e.target.checked)} />
+            <Lock className="size-3" />
+            {t('commentPrivate')}
+          </label>
           <Button variant="primary" className="self-end" disabled={!body.trim() || add.isPending} onClick={() => add.mutate()}>
             {t('commentSubmit')}
           </Button>

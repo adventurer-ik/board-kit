@@ -101,7 +101,7 @@ export function BoardList({ onOpen, initialContextValue }: ListProps) {
             key={p.id}
             type="button"
             onClick={() => onOpen(p.id)}
-            className={cn('grid w-full cursor-pointer grid-cols-1 gap-1 border-b px-4 py-3 text-left text-sm last:border-b-0 hover:bg-accent/60 md:grid-cols-[88px_minmax(0,1fr)_150px_120px_130px_100px] md:items-center md:gap-0', p.closedAt && 'opacity-60')}
+            className={cn('grid w-full cursor-pointer grid-cols-1 gap-1 border-b px-4 py-3 text-left text-sm last:border-b-0 hover:bg-accent/60 md:grid-cols-[88px_minmax(0,1fr)_150px_120px_130px_100px] md:items-center md:gap-0')}
           >
             <div>
               <Badge tone={p.category}>{catName(t, p.category)}</Badge>

@@ -35,6 +35,7 @@ export interface PostSummary {
   context: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string | null;
+  /** 완료 표시(목록 거르기용) — 보기 · 댓글 · 고치기는 그대로 된다 */
   closedAt: string | null;
   comments: number;
   reactions: number;
@@ -49,6 +50,10 @@ export interface CommentView {
   bodyFormat: BodyFormat;
   createdAt: string;
   attachments: AttachmentView[];
+  /** 비밀 댓글 — 글쓴이 · 쓴 사람 · 운영자만 본문을 본다 */
+  private: boolean;
+  /** 보는 사람에게 숨겨진 비밀 댓글(body '' · 첨부 []) — 있다는 것과 쓴 사람만 보인다 */
+  hidden: boolean;
   /** 보는 사람이 지울 수 있는가(본인 또는 운영자) */
   canDelete: boolean;
 }

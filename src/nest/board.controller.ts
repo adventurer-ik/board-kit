@@ -102,7 +102,7 @@ export class BoardControllerBase {
   comment(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
     const b = (body as { body?: unknown } | undefined)?.body;
     if (typeof b !== 'string') throw new BoardError('BOARD_INVALID', { field: 'body', max: LIMITS.comment });
-    return this.svc.addComment(id, b, this.actor(req));
+    return this.svc.addComment(id, b, this.actor(req), (body as { private?: unknown })?.private === true);
   }
 
   @Delete('comments/:id')
@@ -146,8 +146,7 @@ export class BoardControllerBase {
 
   @Get('attachments/:id')
   download(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    this.actor(req);
-    const { abs, row, disposition } = this.svc.openAttachment(id);
+    const { abs, row, disposition } = this.svc.openAttachment(id, this.actor(req));
     res.setHeader('Content-Type', row.mime);
     res.setHeader('Content-Length', String(row.bytes));
     res.setHeader('X-Content-Type-Options', 'nosniff');

@@ -30,6 +30,8 @@ export interface BoardEvent {
   at: string;
   actor: string;
   postId?: number;
+  /** comment.created — 비밀 댓글이면 true(호스트가 알림을 글쓴이에게만 보내는 데 쓴다) */
+  private?: boolean;
   commentId?: number;
   /** 글 제목 — 알림 한 줄을 만들 때 */
   title?: string;
