@@ -1,7 +1,6 @@
 import type { RefObject } from 'react';
 import { LANGS } from '../shared/langs';
 import { useBoard } from './context';
-import { Select } from './ui';
 
 /**
  * "코드 넣기…" 고르기 — 고른 포맷의 ``` 울타리를 글자 상자의 선택 자리(없으면 커서 자리)에 넣는다.
@@ -24,12 +23,13 @@ export function CodeInsert({ textarea, value, onChange }: { textarea: RefObject<
     onChange(text);
   };
   return (
-    <Select
+    <select
       aria-label={t('insertCode')}
       title={t('insertCodeTitle')}
       value=""
       onChange={(e) => e.target.value && insert(e.target.value)}
-      className="h-8 w-auto text-xs"
+      // 공용 Select 는 w-full 이라 줄을 다 차지한다 — 여기는 글자 너비만
+      className="h-8 cursor-pointer rounded-md border border-input bg-background px-2 text-xs text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <option value="">{t('insertCode')}</option>
       {LANGS.map((l) => (
@@ -37,7 +37,7 @@ export function CodeInsert({ textarea, value, onChange }: { textarea: RefObject<
           {l.label}
         </option>
       ))}
-    </Select>
+    </select>
   );
 }
 
