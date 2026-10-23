@@ -1,0 +1,4 @@
+# 네이티브 빌드 허용 — 시험용 better-sqlite3 · vitest 의 esbuild
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
