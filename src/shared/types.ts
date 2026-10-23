@@ -24,6 +24,8 @@ export interface AttachmentView {
   mime: string;
   bytes: number;
   display: AttachDisplay;
+  /** 줄인 미리보기가 있는가 — 있으면 본문에는 `?preview=1` 을 보이고 누르면 원본 */
+  preview: boolean;
   createdAt: string;
 }
 
@@ -50,6 +52,10 @@ export interface CommentView {
   bodyFormat: BodyFormat;
   createdAt: string;
   attachments: AttachmentView[];
+  /** 고친 시각(고친 적 없으면 null) */
+  updatedAt: string | null;
+  /** 보는 사람이 고칠 수 있는가(쓴 사람) */
+  canEdit: boolean;
   /** 비밀 댓글 — 글쓴이 · 쓴 사람 · 운영자만 본문을 본다 */
   private: boolean;
   /** 보는 사람에게 숨겨진 비밀 댓글(body '' · 첨부 []) — 있다는 것과 쓴 사람만 보인다 */

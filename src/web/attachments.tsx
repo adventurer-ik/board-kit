@@ -1,8 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
-import { FileText, Paperclip, Plus, X } from 'lucide-react';
+import { FileText, Image as ImageIcon, Paperclip, Plus, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { AttachDisplay, AttachmentView, BoardConfig } from '../shared/types';
 import { errorCode } from './api';
+import { makePreview } from './preview';
 import { bytesText, useBoard } from './context';
 import type { DictKey } from './i18n';
 import { Alert, Button, cn } from './ui';
@@ -13,6 +14,8 @@ export function AttachmentList({ items, canRemove, onRemoved }: { items: Attachm
   const images = items.filter((a) => a.display === 'inline');
   const files = items.filter((a) => a.display !== 'inline');
   const remove = useMutation({ mutationFn: (id: number) => api.removeAttachment(id), onSuccess: () => onRemoved?.() });
+  const toggle = useMutation({ mutationFn: (a: AttachmentView) => api.setAttachmentDisplay(a.id, a.display === 'inline' ? 'file' : 'inline'), onSuccess: () => onRemoved?.() });
+  const isImage = (a: AttachmentView) => ['png', 'jpeg', 'gif', 'webp'].includes(a.kind);
   if (!items.length) return null;
   return (
     <div className="flex flex-col gap-3">
@@ -22,12 +25,18 @@ export function AttachmentList({ items, canRemove, onRemoved }: { items: Attachm
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {images.map((a) => (
               <figure key={a.id} className="relative m-0 overflow-hidden rounded-lg border bg-muted/30">
-                <a href={api.attachmentUrl(a.id)} target="_blank" rel="noopener noreferrer">
-                  <img src={api.attachmentUrl(a.id)} alt={a.name} className="max-h-72 w-full object-contain" loading="lazy" />
+                {/* 미리보기가 있으면 줄인 그림을 보이고, 누르면 원본 */}
+                <a href={api.attachmentUrl(a.id)} target="_blank" rel="noopener noreferrer" title={t('original')}>
+                  <img src={api.attachmentUrl(a.id, a.preview)} alt={a.name} className="max-h-72 w-full object-contain" loading="lazy" />
                 </a>
-                <figcaption className="flex items-center justify-between px-2.5 py-1.5 text-xs text-muted-foreground">
+                <figcaption className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-muted-foreground">
                   <span className="truncate">{a.name}</span>
-                  <span>{bytesText(a.bytes)}</span>
+                  <span className="ml-auto shrink-0">{bytesText(a.bytes)}</span>
+                  {canRemove && (
+                    <button type="button" className="shrink-0 cursor-pointer rounded border border-input px-1.5 py-0.5 text-[11px] hover:bg-accent" onClick={() => toggle.mutate(a)} disabled={toggle.isPending}>
+                      {t('attachFile')}
+                    </button>
+                  )}
                 </figcaption>
                 {canRemove && (
                   <Button variant="ghost" size="icon" className="absolute top-1 right-1 size-7 bg-background/80" aria-label={t('attachRemove')} onClick={() => remove.mutate(a.id)}>
@@ -52,6 +61,12 @@ export function AttachmentList({ items, canRemove, onRemoved }: { items: Attachm
                 <a href={api.attachmentUrl(a.id)} download={a.name} className="rounded-md border border-input px-2.5 py-1 text-xs font-semibold text-primary hover:bg-accent">
                   {t('download')}
                 </a>
+                {canRemove && isImage(a) && (
+                  <button type="button" className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-input px-2 py-1 text-xs hover:bg-accent" onClick={() => toggle.mutate(a)} disabled={toggle.isPending} title={t('attachInline')}>
+                    <ImageIcon className="size-3.5" />
+                    {t('attachInline')}
+                  </button>
+                )}
                 {canRemove && (
                   <Button variant="ghost" size="icon" className="size-7" aria-label={t('attachRemove')} onClick={() => remove.mutate(a.id)}>
                     <X className="size-3.5" />
@@ -106,8 +121,17 @@ export async function uploadPending(api: ReturnType<typeof useBoard>['api'], own
     if (p.state === 'done') continue;
     pending.patch(p.key, { state: 'uploading' });
     try {
-      await api.attach(owner, p.file, p.display);
+      const saved = await api.attach(owner, p.file, p.display);
       pending.patch(p.key, { state: 'done' });
+      // 큰 그림은 줄인 미리보기를 따로 올린다 — 실패해도 원본은 이미 붙었으니 조용히 넘어간다
+      if (p.isImage) {
+        try {
+          const prev = await makePreview(p.file);
+          if (prev) await api.attachPreview(saved.id, prev);
+        } catch {
+          /* 미리보기 없이 원본만 */
+        }
+      }
     } catch (e) {
       failed++;
       pending.patch(p.key, { state: 'failed', error: errorCode(e) });

@@ -121,6 +121,14 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
     },
   });
   const remove = useMutation({ mutationFn: (id: number) => api.removeComment(id), onSuccess: onChanged });
+  const [editing, setEditing] = useState<{ id: number; body: string } | null>(null);
+  const update = useMutation({
+    mutationFn: (e: { id: number; body: string }) => api.updateComment(e.id, e.body),
+    onSuccess: () => {
+      setEditing(null);
+      onChanged();
+    },
+  });
 
   return (
     <section className="flex flex-col gap-3 border-t pt-5">
@@ -137,13 +145,33 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
               </span>
             )}
             <span>{formatTime(c.createdAt)}</span>
-            {c.canDelete && (
-              <Button variant="ghost" size="sm" className="ml-auto h-6 px-2 text-muted-foreground" onClick={() => window.confirm(t('removeCommentConfirm')) && remove.mutate(c.id)}>
-                {t('remove')}
-              </Button>
-            )}
+            {c.updatedAt && <span title={formatTime(c.updatedAt)}>({t('edited')})</span>}
+            <span className="ml-auto flex gap-1">
+              {c.canEdit && !editing && (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-muted-foreground" onClick={() => setEditing({ id: c.id, body: c.body })}>
+                  {t('edit')}
+                </Button>
+              )}
+              {c.canDelete && (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-muted-foreground" onClick={() => window.confirm(t('removeCommentConfirm')) && remove.mutate(c.id)}>
+                  {t('remove')}
+                </Button>
+              )}
+            </span>
           </div>
-          {c.hidden ? (
+          {editing?.id === c.id ? (
+            <div className="flex flex-col gap-2">
+              <Textarea aria-label={t('edit')} value={editing.body} maxLength={5000} onChange={(e) => setEditing({ id: c.id, body: e.target.value })} className="min-h-20" />
+              <div className="flex justify-end gap-2">
+                <Button size="sm" onClick={() => setEditing(null)}>
+                  {t('cancel')}
+                </Button>
+                <Button size="sm" variant="primary" disabled={!editing.body.trim() || update.isPending} onClick={() => update.mutate(editing)}>
+                  {t('save')}
+                </Button>
+              </div>
+            </div>
+          ) : c.hidden ? (
             <p className="m-0 text-sm text-muted-foreground italic">{t('privateHidden')}</p>
           ) : (
             <>
@@ -172,7 +200,7 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
             {t('commentSubmit')}
           </Button>
         </div>
-        <ErrorLine error={add.error ?? remove.error} />
+        <ErrorLine error={add.error ?? remove.error ?? update.error} />
       </div>
     </section>
   );

@@ -36,6 +36,8 @@
 
 **비밀 댓글(comment.private, 002)** — "글쓴이에게만" 체크. 본문 · 첨부는 글쓴이 · 댓글 쓴 사람 · 운영자만 받고(`canSeeComment`), 남에게는 `hidden: true` 에 body '' · attachments [] — 있다는 것과 쓴 사람은 보인다. 첨부 내려받기도 같은 규칙(남에게는 404). 댓글 수는 그대로 센다. JSONL 에 `private` 가 따라간다. 글의 비밀은 넣지 않는다 — 목록 · 검색 · 맥락 · 내보내기 전부에 권한 분기가 생기고 게시판의 성격과 어긋난다.
 
+**미리보기(attachment.preview_path, 003)** — 서버는 그림 디코더를 두지 않는다(core 의존성 0). 화면(`web/preview.ts`)이 png · jpeg · webp 가 긴 변 1600px 또는 1MB 를 넘으면 canvas 로 줄여 webp 로 `POST attachments/:id/preview` 에 올린다(≤2MB, 매직 바이트로 그림만, 그림 첨부에만, 올린 사람 · 운영자). 본문 `<img>` 는 `?preview=1`, 누르면 원본. 같은 내용 주소 저장소라 지울 때 `pathInUse` 로 원본 · 미리보기 모두 확인. **보이기 바꾸기** `PATCH attachments/:id {display}` — 붙인 뒤에도, 그림만 inline. **댓글 고치기** `PUT comments/:id {body}` — 쓴 사람만, `updated_at`, 비밀 여부는 그대로, 이벤트 `comment.updated`.
+
 **울타리 포맷**(`shared/langs.ts`) — 꼬리표는 저장할 때 바꾸지 않고, 해석(`parseBody`)이 표로 하나의 이름에 맞춘다: `py`→`python`, `node`/`js`→`javascript`, `html`→`xml`, `sh`→`bash`, `yml`→`yaml` … 26종(json · javascript · typescript · python · php · java · kotlin · csharp · c · cpp · go · rust · ruby · xml · css · bash · powershell · sql · yaml · ini · dockerfile · nginx · http · diff · markdown · plaintext). 표에 없는 꼬리표는 소문자 그대로 두고 색 없이 상자로만 — 글은 깨지지 않는다. 색은 화면(`web/highlight.ts`)이 highlight.js 를 **늦게** 불러 입힌다: 본체 한 번 + 문법은 포맷마다 한 번, 첫 묶음에 안 들어감, 30,000자 넘는 코드는 색 생략, 준비되기 전엔 평문으로 바로 보임. 토큰 색은 `.bk-hl` 의 `--bk-hl-*` 변수 두 벌(밝음 · `.dark`) — 호스트가 변수만 덮으면 바뀐다. highlight.js 는 패키지의 유일한 런타임 의존성(0 transitive, BSD-3). 쓰기 창 · 댓글 칸의 "코드 넣기…"(`web/code-insert.tsx`)는 고른 포맷의 울타리를 커서(선택) 자리에 넣는다 — 표를 알지 못해도 포맷을 고를 수 있게.
 
 ## 6. 내보내기 · 가져오기

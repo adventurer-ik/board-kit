@@ -20,6 +20,7 @@ export type BoardEventType =
   | 'post.reopened'
   | 'post.deleted'
   | 'comment.created'
+  | 'comment.updated'
   | 'comment.deleted'
   | 'reaction.changed'
   | 'import.done'

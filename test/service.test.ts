@@ -231,4 +231,40 @@ describe('BoardService', () => {
     const again = svc.list({ closed: 'all' }).items[0]!;
     expect(svc.get(again.id, other).commentList[0]!.hidden).toBe(true);
   });
+  it('미리보기 · 보이기 바꾸기 · 댓글 고치기', async () => {
+    const p = svc.create({ category: 'bug', title: 't', body: 'b' }, kim);
+    const a = await svc.addAttachment({ kind: 'post', id: p.id }, Readable.from([PNG]), { name: 'big.png', display: 'inline' }, kim);
+    expect(a.preview).toBe(false);
+    // 미리보기 — 그림 첨부에만, 올린 사람만, 종류는 매직 바이트
+    await expect(svc.addPreview(a.id, Readable.from([PNG]), lee)).rejects.toThrowError(/BOARD_FORBIDDEN/);
+    await expect(svc.addPreview(a.id, Readable.from([Buffer.from('not image')]), kim)).rejects.toThrowError(/BOARD_ATTACH_KIND/);
+    const pv = await svc.addPreview(a.id, Readable.from([PNG]), kim);
+    expect(pv.preview).toBe(true);
+    const o = svc.openAttachment(a.id, lee, true);
+    expect(o.mime).toBe('image/png');
+    expect(o.disposition).toBe('inline');
+    const txt = await svc.addAttachment({ kind: 'post', id: p.id }, Readable.from([Buffer.from('plain text')]), { name: 'a.txt' }, kim);
+    await expect(svc.addPreview(txt.id, Readable.from([PNG]), kim)).rejects.toThrowError(/BOARD_INVALID/);
+    // 보이기 바꾸기 — 그림은 양쪽, 그림이 아니면 inline 불가, 남은 못 바꾼다
+    expect(svc.setAttachmentDisplay(a.id, 'file', kim).display).toBe('file');
+    expect(svc.openAttachment(a.id, kim).disposition).toBe('attachment');
+    expect(svc.setAttachmentDisplay(a.id, 'inline', root).display).toBe('inline');
+    expect(() => svc.setAttachmentDisplay(txt.id, 'inline', kim)).toThrowError(/BOARD_INVALID/);
+    expect(() => svc.setAttachmentDisplay(a.id, 'file', lee)).toThrowError(/BOARD_FORBIDDEN/);
+    // 지우면 원본 · 미리보기 파일 모두(같은 내용이라 한 파일) — 다른 행이 안 쓰면
+    const abs = svc.openAttachment(a.id, kim).abs;
+    svc.removeAttachment(a.id, kim);
+    expect(existsSync(abs)).toBe(false);
+    // 댓글 고치기 — 쓴 사람만, updated_at · canEdit
+    const c = svc.addComment(p.id, '처음', lee, true);
+    expect(c.canEdit).toBe(true);
+    expect(c.updatedAt).toBeNull();
+    expect(() => svc.updateComment(c.id, '남이', kim)).toThrowError(/BOARD_FORBIDDEN/);
+    const u = svc.updateComment(c.id, '고침', lee);
+    expect(u.body).toBe('고침');
+    expect(u.private).toBe(true);
+    expect(u.updatedAt).not.toBeNull();
+    expect(svc.get(p.id, kim).commentList[0]!.canEdit).toBe(false);
+    expect(events.some((e) => e.type === 'comment.updated')).toBe(true);
+  });
 });

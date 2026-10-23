@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Put, Query, Req, Res, UseFilters } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, Patch, Post, Put, Query, Req, Res, UseFilters } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createReadStream } from 'node:fs';
 import { Readable } from 'node:stream';
@@ -105,6 +105,13 @@ export class BoardControllerBase {
     return this.svc.addComment(id, b, this.actor(req), (body as { private?: unknown })?.private === true);
   }
 
+  @Put('comments/:id')
+  updateComment(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+    const b = (body as { body?: unknown } | undefined)?.body;
+    if (typeof b !== 'string') throw new BoardError('BOARD_INVALID', { field: 'body', max: LIMITS.comment });
+    return this.svc.updateComment(id, b, this.actor(req));
+  }
+
   @Delete('comments/:id')
   @HttpCode(204)
   removeComment(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
@@ -144,11 +151,30 @@ export class BoardControllerBase {
     return this.svc.addAttachment(owner, req, { name: name ?? 'file', display: display === 'inline' ? 'inline' : 'file' }, a);
   }
 
+  /** 미리보기 올리기 — 화면이 줄인 그림(webp · jpeg · png ≤2MB), 본문은 파일 그대로 */
+  @Post('attachments/:id/preview')
+  async preview(@Req() req: Request, @Param('id', ParseIntPipe) id: number) {
+    let a: Actor;
+    try {
+      a = this.actor(req);
+    } catch (e) {
+      req.resume();
+      throw e;
+    }
+    return this.svc.addPreview(id, req, a);
+  }
+
+  @Patch('attachments/:id')
+  setDisplay(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+    const d = (body as { display?: unknown } | undefined)?.display;
+    return this.svc.setAttachmentDisplay(id, d === 'inline' ? 'inline' : 'file', this.actor(req));
+  }
+
   @Get('attachments/:id')
-  download(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const { abs, row, disposition } = this.svc.openAttachment(id, this.actor(req));
-    res.setHeader('Content-Type', row.mime);
-    res.setHeader('Content-Length', String(row.bytes));
+  download(@Req() req: Request, @Param('id', ParseIntPipe) id: number, @Query('preview') preview: string | undefined, @Res() res: Response) {
+    const { abs, row, mime, bytes, disposition } = this.svc.openAttachment(id, this.actor(req), preview === '1');
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Length', String(bytes));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('Content-Disposition', `${disposition}; filename*=UTF-8''${encodeURIComponent(row.name)}`);

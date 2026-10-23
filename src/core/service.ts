@@ -1,6 +1,7 @@
 import type { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import {
+  type AttachKind,
   type AttachDisplay, type AttachmentView, type BoardConfig, type Category, type CommentView, type ContextFacet, DEFAULT_CATEGORIES, INLINE_KINDS,
   type ListQuery, type ListResult, type PostSummary, type PostView,
 } from '../shared/types';
@@ -9,7 +10,7 @@ import { AttachStore } from './files';
 import type { Actor, BoardEvent, BoardEventType, BoardHost } from './host';
 import { attachAndMigrate } from './migrate';
 import { type AttachmentRow, BoardRepo, type CommentRow, type PostRow } from './repo';
-import { MIME } from './sniff';
+import { EXT, MIME } from './sniff';
 import { now } from './time';
 
 export const LIMITS = { title: 200, body: 20_000, comment: 5_000, page: 50, pageMax: 200 } as const;
@@ -132,6 +133,19 @@ export class BoardService {
     return commentView(this.repo.comment(id)!, [], actor, p.author);
   }
 
+  /** 댓글 고치기 — 쓴 사람만. 비밀 여부는 안 바뀐다 */
+  updateComment(id: number, body: string, actor: Actor): CommentView {
+    const c = this.repo.comment(id);
+    if (!c || c.deleted_at) throw new BoardError('BOARD_NOT_FOUND');
+    if (c.author !== actor.name) throw new BoardError('BOARD_FORBIDDEN');
+    const p = this.live(c.post_id);
+    const b = (body ?? '').trim();
+    if (!b || b.length > LIMITS.comment) throw new BoardError('BOARD_INVALID', { field: 'body', max: LIMITS.comment });
+    this.repo.updateComment(id, b);
+    this.emit('comment.updated', actor, { postId: c.post_id, commentId: id, title: p.title, postAuthor: p.author, private: !!c.private });
+    return commentView(this.repo.comment(id)!, this.repo.attachments('comment', id), actor, p.author);
+  }
+
   removeComment(id: number, actor: Actor): void {
     const c = this.repo.comment(id);
     if (!c || c.deleted_at) throw new BoardError('BOARD_NOT_FOUND');
@@ -173,16 +187,53 @@ export class BoardService {
     return attachmentView(this.repo.attachment(id)!);
   }
 
+  /**
+   * 미리보기 — 화면이 큰 그림을 줄여(긴 변 1600px, webp) 올린다. 본문에는 이것을 보이고 누르면 원본.
+   * 서버는 그림 디코더를 두지 않는다(의존성 0) — 그림 종류 · 크기만 확인한다. 그림 첨부에만, 올린 사람(또는 운영자)만
+   */
+  async addPreview(id: number, input: Readable, actor: Actor): Promise<AttachmentView> {
+    const a = this.repo.attachment(id);
+    if (!a || a.deleted_at || !this.store) {
+      input.resume();
+      throw new BoardError('BOARD_NOT_FOUND');
+    }
+    const owner = this.ownerAuthor({ kind: a.owner_kind, id: a.owner_id });
+    if (owner !== actor.name && !actor.moderator) {
+      input.resume();
+      throw new BoardError('BOARD_FORBIDDEN');
+    }
+    if (!INLINE_KINDS.includes(a.kind)) {
+      input.resume();
+      throw new BoardError('BOARD_INVALID', { field: 'preview' });
+    }
+    const stored = await this.store.save(input, PREVIEW_MAX_BYTES, PREVIEW_KINDS);
+    if (a.preview_path && a.preview_path !== stored.path && !this.repo.pathInUse(a.preview_path)) this.store.remove(a.preview_path);
+    this.repo.setPreview(id, stored.path, stored.bytes);
+    return attachmentView(this.repo.attachment(id)!);
+  }
+
+  /** 보이기 방식 바꾸기 — 붙인 뒤에도 "본문에 보이기 ↔ 파일로만". 그림이 아니면 inline 불가 */
+  setAttachmentDisplay(id: number, display: AttachDisplay, actor: Actor): AttachmentView {
+    const a = this.repo.attachment(id);
+    if (!a || a.deleted_at) throw new BoardError('BOARD_NOT_FOUND');
+    this.mayModerate(this.ownerAuthor({ kind: a.owner_kind, id: a.owner_id }), actor);
+    if (display === 'inline' && !INLINE_KINDS.includes(a.kind)) throw new BoardError('BOARD_INVALID', { field: 'display' });
+    this.repo.setDisplay(id, display === 'inline' ? 'inline' : 'file');
+    return attachmentView(this.repo.attachment(id)!);
+  }
+
   removeAttachment(id: number, actor: Actor): void {
     const a = this.repo.attachment(id);
     if (!a || a.deleted_at) throw new BoardError('BOARD_NOT_FOUND');
     this.mayModerate(this.ownerAuthor({ kind: a.owner_kind, id: a.owner_id }), actor);
     this.repo.deleteAttachment(id);
-    if (this.store && !this.repo.sha256InUse(a.sha256)) this.store.remove(a.path);
+    if (!this.store) return;
+    if (!this.repo.pathInUse(a.path)) this.store.remove(a.path);
+    if (a.preview_path && !this.repo.pathInUse(a.preview_path)) this.store.remove(a.preview_path);
   }
 
   /** 내려주기 — 어댑터가 파일을 흘린다. inline 그림만 그림 MIME, 나머지는 받기(attachment) */
-  openAttachment(id: number, actor: Actor): { abs: string; row: AttachmentRow; disposition: 'inline' | 'attachment' } {
+  openAttachment(id: number, actor: Actor, preview = false): { abs: string; row: AttachmentRow; mime: string; bytes: number; disposition: 'inline' | 'attachment' } {
     const a = this.repo.attachment(id);
     if (!a || a.deleted_at || !this.store) throw new BoardError('BOARD_NOT_FOUND');
     const comment = a.owner_kind === 'comment' ? this.repo.comment(a.owner_id) : undefined;
@@ -191,7 +242,9 @@ export class BoardService {
     // 비밀 댓글의 첨부는 본문과 같은 사람에게만 — 남에게는 없는 것처럼
     if (comment && !canSeeComment(comment, actor, post.author)) throw new BoardError('BOARD_NOT_FOUND');
     const inline = a.display === 'inline' && INLINE_KINDS.includes(a.kind);
-    return { abs: this.store.abs(a.path), row: a, disposition: inline ? 'inline' : 'attachment' };
+    // 미리보기는 그림이라 늘 inline — 없으면 원본을 준다
+    if (preview && a.preview_path) return { abs: this.store.abs(a.preview_path), row: a, mime: mimeOfPath(a.preview_path), bytes: a.preview_bytes ?? this.store.size(a.preview_path), disposition: 'inline' };
+    return { abs: this.store.abs(a.path), row: a, mime: a.mime, bytes: a.bytes, disposition: inline ? 'inline' : 'attachment' };
   }
 
   // ── 내보내기 · 가져오기 · 비우기 ──
@@ -291,7 +344,7 @@ export class BoardService {
   }
 
   private copyTimes(table: 'post' | 'comment', id: number, o: Record<string, unknown>): void {
-    const cols = table === 'post' ? ['created_at', 'updated_at', 'closed_at', 'closed_by', 'deleted_at', 'deleted_by'] : ['created_at', 'deleted_at', 'deleted_by'];
+    const cols = table === 'post' ? ['created_at', 'updated_at', 'closed_at', 'closed_by', 'deleted_at', 'deleted_by'] : ['created_at', 'updated_at', 'deleted_at', 'deleted_by'];
     const sets = cols.filter((c) => o[c] !== undefined && o[c] !== null);
     if (!sets.length) return;
     this.host.db.prepare(`UPDATE board.${table} SET ${sets.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`).run(...sets.map((c) => String(o[c])), id);
@@ -306,6 +359,8 @@ export class BoardService {
     this.repo.insertAttachment({
       owner_kind: kind, owner_id: ownerId, name: safeName(String(a['name'] ?? 'file')), kind: a['kind'] as AttachmentRow['kind'], mime: String(a['mime'] ?? 'application/octet-stream'),
       bytes: Number(a['bytes'] ?? this.store.size(path)), sha256: String(a['sha256'] ?? ''), display: a['display'] === 'inline' ? 'inline' : 'file', path,
+      preview_path: typeof a['preview_path'] === 'string' && this.store.exists(a['preview_path']) ? a['preview_path'] : null,
+      preview_bytes: typeof a['preview_bytes'] === 'number' ? a['preview_bytes'] : null,
     });
     return 1;
   }
@@ -347,7 +402,9 @@ function commentView(c: CommentRow, atts: AttachmentRow[], actor: Actor, postAut
     body: visible ? c.body : '',
     bodyFormat: 'text',
     createdAt: c.created_at,
+    updatedAt: c.updated_at,
     attachments: visible ? atts.map(attachmentView) : [],
+    canEdit: c.author === actor.name,
     private: priv,
     hidden: !visible,
     canDelete: c.author === actor.name || actor.moderator,
@@ -355,8 +412,19 @@ function commentView(c: CommentRow, atts: AttachmentRow[], actor: Actor, postAut
 }
 
 function attachmentView(a: AttachmentRow): AttachmentView {
-  return { id: a.id, name: a.name, kind: a.kind, mime: a.mime, bytes: a.bytes, display: a.display, createdAt: a.created_at };
+  return { id: a.id, name: a.name, kind: a.kind, mime: a.mime, bytes: a.bytes, display: a.display, preview: !!a.preview_path, createdAt: a.created_at };
 }
+
+/** 미리보기 파일의 MIME — 디스크 이름의 확장자(저장 때 매직 바이트로 정한 것)로 */
+function mimeOfPath(path: string): string {
+  const ext = path.slice(path.lastIndexOf('.') + 1);
+  const kind = (Object.keys(EXT) as AttachKind[]).find((k) => EXT[k] === ext);
+  return kind ? MIME[kind] : 'application/octet-stream';
+}
+
+/** 미리보기 한도 — 화면이 1600px webp 로 줄여 보내므로 2MB 면 넉넉하다 */
+const PREVIEW_MAX_BYTES = 2 * 1024 * 1024;
+const PREVIEW_KINDS: readonly AttachKind[] = ['webp', 'jpeg', 'png'];
 
 /** 화면용 이름 — 경로 글자 · 제어 문자를 빼고 200자로 */
 export function safeName(name: string): string {
