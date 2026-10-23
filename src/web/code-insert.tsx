@@ -14,13 +14,14 @@ export function CodeInsert({ textarea, value, onChange }: { textarea: RefObject<
     const start = el?.selectionStart ?? value.length;
     const end = el?.selectionEnd ?? value.length;
     const { text, caret } = wrapFence(value, start, end, lang);
-    onChange(text);
-    // 상태가 반영된 다음 틱에 커서를 울타리 안으로
-    requestAnimationFrame(() => {
-      if (!el) return;
-      el.focus();
+    // DOM 값과 커서를 먼저 동기로 넣고 상태를 바꾼다 — React 는 값이 같으면 다시 쓰지 않아 커서가 그대로 남는다
+    // (상태를 먼저 바꾸고 다음 틱에 커서를 옮기면, 그 사이 들어온 입력이 끝에 붙는다)
+    if (el) {
+      el.value = text;
       el.setSelectionRange(caret, caret);
-    });
+      el.focus();
+    }
+    onChange(text);
   };
   return (
     <Select
