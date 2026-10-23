@@ -8,14 +8,17 @@
  *   ```
  *
  * → [{ kind:'text', ... }, { kind:'fence', lang:'json', code:'{\n  "a": 1\n}', pretty:true }]
+ *
+ * 울타리 꼬리표(```py ```node ```html …)는 langs.ts 표로 하나의 이름에 맞춘다 — 색 입히기는 화면(web/highlight.ts)이 한다.
  */
+import { normalizeLang } from './langs';
 export type Segment =
   | { kind: 'text'; parts: TextPart[] }
   | { kind: 'fence'; lang: string | null; code: string; /** json 울타리를 정렬했는가(파싱 실패면 false) */ pretty: boolean };
 
 export type TextPart = { kind: 'plain'; text: string } | { kind: 'link'; href: string };
 
-const FENCE = /^```([A-Za-z0-9_+-]*)[ \t]*$/;
+const FENCE = /^```([A-Za-z0-9_#+-]*)[ \t]*$/;
 const URL = /https?:\/\/[^\s<>"'`]+/g;
 
 export function parseBody(body: string): Segment[] {
@@ -42,7 +45,7 @@ export function parseBody(body: string): Segment[] {
     }
     if (m) {
       flushText();
-      fence = { lang: m[1] ? m[1].toLowerCase() : null, lines: [] };
+      fence = { lang: normalizeLang(m[1]), lines: [] };
       continue;
     }
     text.push(line);

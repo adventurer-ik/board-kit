@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, useEffect } from 'react';
+import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type Ref, type SelectHTMLAttributes, type TextareaHTMLAttributes, useEffect } from 'react';
 
 /**
  * 작은 화면 부품 — 호스트의 UI 라이브러리를 가져오지 않는다.
@@ -25,8 +25,8 @@ const FIELD = 'w-full rounded-md border border-input bg-background px-3 text-sm 
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(FIELD, 'h-9', className)} {...rest} />;
 }
-export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cn(FIELD, 'min-h-24 resize-y py-2 leading-relaxed', className)} {...rest} />;
+export function Textarea({ className, ref, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
+  return <textarea ref={ref} className={cn(FIELD, 'min-h-24 resize-y py-2 leading-relaxed', className)} {...rest} />;
 }
 export function Select({ className, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select className={cn(FIELD, 'h-9', className)} {...rest} />;

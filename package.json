@@ -4,15 +4,26 @@
   "description": "작은 소통 게시판 — 어떤 관리 화면에도 붙여 쓰는 독립 모듈 (SQLite 파일 하나 · NestJS 어댑터 · React 화면)",
   "license": "MIT",
   "author": "adventurer-ik",
-  "repository": { "type": "git", "url": "https://github.com/adventurer-ik/board-kit.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adventurer-ik/board-kit.git"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./web": "./src/web/index.ts",
     "./shared": "./src/shared/index.ts"
   },
-  "files": ["dist", "src", "LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-schema.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json",
@@ -27,11 +38,21 @@
     "react-dom": ">=19"
   },
   "peerDependenciesMeta": {
-    "@nestjs/common": { "optional": true },
-    "@tanstack/react-query": { "optional": true },
-    "lucide-react": { "optional": true },
-    "react": { "optional": true },
-    "react-dom": { "optional": true }
+    "@nestjs/common": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "lucide-react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@nestjs/common": "^11.1.6",
@@ -49,5 +70,8 @@
     "rxjs": "^7.8.2",
     "typescript": "^5.9.2",
     "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "highlight.js": "^11.12.0"
   }
 }

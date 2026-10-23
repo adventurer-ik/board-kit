@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ThumbsUp } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { CommentView } from '../shared/types';
 import { AttachmentList, AttachPicker, ErrorLine, uploadPending, usePending } from './attachments';
 import { Body } from './body';
 import { catName, ComposeDialog } from './compose';
+import { CodeInsert } from './code-insert';
 import { useBoard } from './context';
 import { Badge, Button, Label, Textarea, cn } from './ui';
 
@@ -103,6 +104,7 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
   const { api, t, formatTime } = useBoard();
   const cfg = useQuery({ queryKey: ['board', 'config'], queryFn: api.config });
   const [body, setBody] = useState('');
+  const commentRef = useRef<HTMLTextAreaElement>(null);
   const pending = usePending(cfg.data?.attach ?? null);
   const add = useMutation({
     mutationFn: async () => {
@@ -138,8 +140,11 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
         </div>
       ))}
       <div className="mt-1 flex flex-col gap-2">
-        <Label htmlFor="bk-comment">{t('commentWrite')}</Label>
-        <Textarea id="bk-comment" value={body} maxLength={5000} onChange={(e) => setBody(e.target.value)} placeholder={t('commentPlaceholder')} className="min-h-20" />
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="bk-comment">{t('commentWrite')}</Label>
+          <CodeInsert textarea={commentRef} value={body} onChange={setBody} />
+        </div>
+        <Textarea id="bk-comment" ref={commentRef} value={body} maxLength={5000} onChange={(e) => setBody(e.target.value)} placeholder={t('commentPlaceholder')} className="min-h-20" />
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
             <AttachPicker pending={pending} rule={cfg.data?.attach ?? null} />

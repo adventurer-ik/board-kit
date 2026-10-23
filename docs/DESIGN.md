@@ -32,6 +32,8 @@
 ## 5. 본문 형식 `text`
 평문 + 줄바꿈 + `http(s)://` 자동 링크 + 울타리 블록(```` ``` ```` 또는 ```` ```lang ````). `json` 울타리는 파싱되면 2칸 들여쓰기로 정렬해 보이고(원문은 그대로 저장), 안 되면 "JSON 아님" 표시. 닫히지 않은 울타리도 상자로. markdown 은 넣지 않는다 — `body_format` 열에 자리만.
 
+**울타리 포맷**(`shared/langs.ts`) — 꼬리표는 저장할 때 바꾸지 않고, 해석(`parseBody`)이 표로 하나의 이름에 맞춘다: `py`→`python`, `node`/`js`→`javascript`, `html`→`xml`, `sh`→`bash`, `yml`→`yaml` … 26종(json · javascript · typescript · python · php · java · kotlin · csharp · c · cpp · go · rust · ruby · xml · css · bash · powershell · sql · yaml · ini · dockerfile · nginx · http · diff · markdown · plaintext). 표에 없는 꼬리표는 소문자 그대로 두고 색 없이 상자로만 — 글은 깨지지 않는다. 색은 화면(`web/highlight.ts`)이 highlight.js 를 **늦게** 불러 입힌다: 본체 한 번 + 문법은 포맷마다 한 번, 첫 묶음에 안 들어감, 30,000자 넘는 코드는 색 생략, 준비되기 전엔 평문으로 바로 보임. 토큰 색은 `.bk-hl` 의 `--bk-hl-*` 변수 두 벌(밝음 · `.dark`) — 호스트가 변수만 덮으면 바뀐다. highlight.js 는 패키지의 유일한 런타임 의존성(0 transitive, BSD-3). 쓰기 창 · 댓글 칸의 "코드 넣기…"(`web/code-insert.tsx`)는 고른 포맷의 울타리를 커서(선택) 자리에 넣는다 — 표를 알지 못해도 포맷을 고를 수 있게.
+
 ## 6. 내보내기 · 가져오기
 JSONL — 첫 줄 머리(`kind: board-kit`), 그 뒤 글 한 줄(댓글 · 반응 · 첨부 메타 포함, 지운 글은 지운 채로). 첨부 파일은 첨부 폴더를 그대로 복사하면 내용 주소로 맞는다. 가져오기는 새 id 로 붙이고 원래 id 는 `context._importedId` 에 남긴다. 파일이 없는 첨부는 건너뛰고 수를 돌려준다.
 

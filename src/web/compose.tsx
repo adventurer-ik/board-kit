@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PostView } from '../shared/types';
 import { AttachPicker, ErrorLine, uploadPending, usePending } from './attachments';
+import { CodeInsert } from './code-insert';
 import { useBoard } from './context';
 import type { DictKey } from './i18n';
 import { Button, Dialog, Input, Label, Select, Textarea } from './ui';
@@ -32,6 +33,7 @@ export function ComposeDialog(p: ComposeProps) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [body, setBody] = useState('');
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [createdId, setCreatedId] = useState<number | null>(null);
   const pending = usePending(cfg.data?.attach ?? null);
 
@@ -116,8 +118,11 @@ export function ComposeDialog(p: ComposeProps) {
         </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="bk-body">{t('fBody')}</Label>
-        <Textarea id="bk-body" value={body} maxLength={20_000} onChange={(e) => setBody(e.target.value)} className="min-h-44 font-[inherit]" />
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="bk-body">{t('fBody')}</Label>
+          <CodeInsert textarea={bodyRef} value={body} onChange={setBody} />
+        </div>
+        <Textarea id="bk-body" ref={bodyRef} value={body} maxLength={20_000} onChange={(e) => setBody(e.target.value)} className="min-h-44 font-[inherit]" />
         <p className="m-0 text-xs text-muted-foreground">{t('bodyHint')}</p>
       </div>
       <AttachPicker pending={pending} rule={cfg.data?.attach ?? null} existing={p.post?.attachmentList.length ?? 0} />

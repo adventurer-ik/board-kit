@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      highlight.js:
+        specifier: ^11.12.0
+        version: 11.12.0
     devDependencies:
       '@nestjs/common':
         specifier: ^11.1.6
@@ -589,6 +593,10 @@ packages:
 
   github-from-package@0.0.0:
     resolution: {integrity: sha512-SyHy3T1v2NUXn29OsWdxmK6RwHD+vkj3v8en8AOBZ1wBQ/hCAQ5bAQTD02kW4W9tUp/3Qh6J8r9EvntiyCmOOw==}
+
+  highlight.js@11.12.0:
+    resolution: {integrity: sha512-nbfWpyRMcMrPMmDwJB+dhX/eiaPKtc2RB+0QZskqJ3WjRA/FDS0e9hZrx8EC/lbEv8gXy98FcDbNa/dspAaJMg==}
+    engines: {node: '>=12.0.0'}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -1307,6 +1315,8 @@ snapshots:
     optional: true
 
   github-from-package@0.0.0: {}
+
+  highlight.js@11.12.0: {}
 
   ieee754@1.2.1: {}
 
