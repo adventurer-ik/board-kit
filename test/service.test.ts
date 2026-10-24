@@ -155,6 +155,11 @@ describe('BoardService', () => {
     expect(existsSync(o1.abs)).toBe(true); // q 가 아직 쓴다
     svc.removeAttachment(dup.id, root);
     expect(existsSync(o1.abs)).toBe(false);
+    // 행은 남았는데 파일이 사라졌다(첨부 폴더를 빼고 복원) — 스트림을 열다 터지지 않고 404
+    const lost = await svc.addAttachment({ kind: 'post', id: q.id }, Readable.from([PNG]), { name: 'lost.png' }, lee);
+    rmSync(svc.openAttachment(lost.id).abs);
+    expect(() => svc.openAttachment(lost.id)).toThrowError(/BOARD_NOT_FOUND/);
+    svc.removeAttachment(lost.id, root); // 파일이 없어도 행은 지울 수 있다
     expect(existsSync(join(dir, 'files', 'tmp'))).toBe(true);
     expect(svc.stats()).toEqual({ posts: 2, comments: 0, attachments: 1, bytes: 9 });
   });

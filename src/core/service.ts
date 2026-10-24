@@ -242,8 +242,10 @@ export class BoardService {
     // 비밀 댓글의 첨부는 본문과 같은 사람에게만 — 남에게는 없는 것처럼
     if (comment && !canSeeComment(comment, actor, post.author)) throw new BoardError('BOARD_NOT_FOUND');
     const inline = a.display === 'inline' && INLINE_KINDS.includes(a.kind);
-    // 미리보기는 그림이라 늘 inline — 없으면 원본을 준다
-    if (preview && a.preview_path) return { abs: this.store.abs(a.preview_path), row: a, mime: mimeOfPath(a.preview_path), bytes: a.preview_bytes ?? this.store.size(a.preview_path), disposition: 'inline' };
+    // 미리보기는 그림이라 늘 inline — 없으면(안 만들었거나 파일이 사라졌으면) 원본을 준다
+    if (preview && a.preview_path && this.store.exists(a.preview_path)) return { abs: this.store.abs(a.preview_path), row: a, mime: mimeOfPath(a.preview_path), bytes: a.preview_bytes ?? this.store.size(a.preview_path), disposition: 'inline' };
+    // 행은 있는데 파일이 없다 — 첨부 폴더를 빼고 복원했거나 손으로 지운 경우. 스트림을 열다 터지지 않게 여기서 404 로
+    if (!this.store.exists(a.path)) throw new BoardError('BOARD_NOT_FOUND', { reason: 'file-missing' });
     return { abs: this.store.abs(a.path), row: a, mime: a.mime, bytes: a.bytes, disposition: inline ? 'inline' : 'attachment' };
   }
 

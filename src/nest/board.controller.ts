@@ -178,7 +178,10 @@ export class BoardControllerBase {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('Content-Disposition', `${disposition}; filename*=UTF-8''${encodeURIComponent(row.name)}`);
-    createReadStream(abs).pipe(res);
+    // 열고 나서 파일이 사라지는 경쟁(지우기와 겹침) — 스트림 오류가 프로세스로 튀지 않게 응답만 끊는다
+    const stream = createReadStream(abs);
+    stream.on('error', () => res.destroy());
+    stream.pipe(res);
   }
 
   @Delete('attachments/:id')
