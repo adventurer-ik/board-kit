@@ -1,5 +1,6 @@
 import type { Readable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
+import { existsSync, renameSync } from 'node:fs';
 import {
   type AttachKind,
   type AttachDisplay, type AttachmentView, type BoardConfig, type Category, type CommentView, type ContextFacet, DEFAULT_CATEGORIES, INLINE_KINDS,
@@ -101,6 +102,36 @@ export class BoardService {
       }
       this.emit('unavailable', SYSTEM, { detail: { file: this.host.file, message } });
     }
+  }
+
+  /**
+   * [새로 시작](운영자) — 고장 상태에서만. 깨진 DB 파일 셋과 첨부 폴더를 `<이름>.broken-<시각>` 으로 옆으로 옮기고 바로 다시 열어 빈 게시판으로.
+   * 지우지 않는다 — 옮긴 파일은 백업 · 복구에 쓸 수 있다. 멀쩡한 게시판을 비우는 것은 wipe().
+   */
+  startFresh(actor: Actor): { movedTo: string[] } {
+    if (!this.fault) throw new BoardError('BOARD_INVALID', { reason: 'not-faulted' });
+    try {
+      this.host.db.exec('DETACH DATABASE board');
+    } catch {
+      /* 이미 떼어져 있다 */
+    }
+    const stamp = now().replace(/[-: ]/g, '').replace(/^(\d{8})(\d{6})$/, '$1-$2');
+    const movedTo: string[] = [];
+    const f = this.host.file;
+    for (const p of [f, `${f}-wal`, `${f}-shm`, `${f}.pre-migrate`]) {
+      if (!existsSync(p)) continue;
+      const to = `${p}.broken-${stamp}`;
+      renameSync(p, to);
+      movedTo.push(to);
+    }
+    if (this.store && existsSync(this.store.dir)) {
+      const to = `${this.store.dir}.broken-${stamp}`;
+      renameSync(this.store.dir, to);
+      movedTo.push(to);
+    }
+    this.emit('reset', actor, { detail: { movedTo } });
+    this.recover(true);
+    return { movedTo };
   }
 
   /** 호스트의 상태 화면 · 점검 명령용 */

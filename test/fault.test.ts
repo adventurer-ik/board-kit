@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -74,6 +74,29 @@ describe('게시판 파일 고장 격리', () => {
     await new Promise((r) => setTimeout(r, 80));
     expect(svc.config(kim).unavailable).toBeNull(); // 간격이 지나 config 가 다시 열었다
     expect(svc.status().ok).toBe(true);
+  });
+
+  it('[새로 시작] — 고장 상태에서만, 파일 셋 · 첨부 폴더를 .broken-<시각> 으로 옮기고 빈 게시판으로(지우지 않음)', () => {
+    writeFileSync(join(dir, 'board.sqlite'), Buffer.alloc(8192, 0x5a));
+    writeFileSync(join(dir, 'board.sqlite-wal'), Buffer.alloc(16));
+    mkdirSync(join(dir, 'files'), { recursive: true });
+    writeFileSync(join(dir, 'files', 'x.bin'), 'keep');
+    const svc = new BoardService(host(0));
+    expect(svc.status().ok).toBe(false);
+    const r = svc.startFresh(kim);
+    // sqlite · files/ 는 반드시(-wal 은 SQLite 가 깨진 파일을 열 때 치울 수 있어 세지 않는다)
+    expect(r.movedTo.some((p) => /board\.sqlite\.broken-/.test(p))).toBe(true);
+    expect(r.movedTo.some((p) => /files\.broken-/.test(p))).toBe(true);
+    for (const p of r.movedTo) expect(existsSync(p)).toBe(true);
+    expect(existsSync(join(dir, 'files', 'x.bin'))).toBe(false);
+    expect(r.movedTo.every((p) => /\.broken-\d{8}-\d{6}$/.test(p))).toBe(true);
+    expect(svc.status().ok).toBe(true);
+    expect(events.map((e) => e.type)).toEqual(['unavailable', 'reset', 'recovered']);
+    expect(svc.list({}).total).toBe(0);
+    svc.create({ category: 'bug', title: '새 글', body: 'b' }, kim);
+    expect(svc.list({}).total).toBe(1);
+    // 멀쩡한 게시판에서는 거부(비우기는 wipe)
+    expect(() => svc.startFresh(kim)).toThrowError(/BOARD_INVALID/);
   });
 
   it('markFault — 요청 도중 손상을 알리면 사용 불가로 돌리고 DETACH', () => {

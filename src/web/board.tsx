@@ -6,7 +6,7 @@ import { ComposeDialog } from './compose';
 import { useBoard } from './context';
 import { BoardList } from './list';
 import { PostDetail } from './post';
-import { Button } from './ui';
+import { Alert, Button } from './ui';
 
 export interface BoardProps {
   /** 보고 있는 글 — null 이면 목록. 주소(라우터)와 묶는 것은 호스트 */
@@ -49,6 +49,7 @@ export function Board({ postId, onNavigate, header = true, initialContextValue }
 function Unavailable({ cfg, onRetried }: { cfg: BoardConfig; onRetried: () => void }) {
   const { api, t } = useBoard();
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
   const u = cfg.unavailable!;
   const retry = async () => {
     setBusy(true);
@@ -61,6 +62,21 @@ function Unavailable({ cfg, onRetried }: { cfg: BoardConfig; onRetried: () => vo
       onRetried();
     }
   };
+  // 새로 시작 — 파일을 옆으로 옮기고 빈 게시판으로(지우지 않는다). 운영자가 서버에 들어가지 않아도 되게
+  const startFresh = async () => {
+    if (!window.confirm(t('startFreshConfirm'))) return;
+    setBusy(true);
+    try {
+      const r = await api.reset();
+      setDone(t('startFreshDone', { files: r.movedTo.join(', ') }));
+    } catch {
+      /* 실패하면 상자가 그대로 남는다 */
+    } finally {
+      setBusy(false);
+      onRetried();
+    }
+  };
+  if (done) return <Alert>{done}</Alert>;
   return (
     <div role="alert" className="flex flex-col items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-10 text-center text-sm">
       <p className="m-0 font-medium text-destructive">{t('unavailable')}</p>
@@ -69,9 +85,14 @@ function Unavailable({ cfg, onRetried }: { cfg: BoardConfig; onRetried: () => vo
         {t('unavailableSince', { since: u.since })} · {u.message}
       </p>
       {cfg.me?.moderator && (
-        <Button variant="outline" onClick={retry} disabled={busy}>
-          {t('retry')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={retry} disabled={busy}>
+            {t('retry')}
+          </Button>
+          <Button variant="danger" onClick={startFresh} disabled={busy}>
+            {t('startFresh')}
+          </Button>
+        </div>
       )}
     </div>
   );

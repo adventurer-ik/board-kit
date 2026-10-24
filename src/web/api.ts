@@ -46,6 +46,8 @@ export class BoardApi {
   config = () => this.f<BoardConfig>('GET', `${this.base}/config`);
   /** 파일을 고친 뒤 다시 열기(운영자) */
   retry = () => this.f<BoardConfig>('POST', `${this.base}/retry`);
+  /** [새로 시작](운영자, 고장 상태에서만) — 깨진 파일을 옆으로 옮기고 빈 게시판으로 */
+  reset = () => this.f<BoardConfig & { movedTo: string[] }>('POST', `${this.base}/reset`);
   list = (q: ListQuery) => {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== null && v !== '') p.set(k, String(v));

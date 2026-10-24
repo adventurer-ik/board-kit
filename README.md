@@ -48,7 +48,7 @@ Tailwind 가 이 패키지의 소스를 읽어야 한다 — 호스트 CSS 에 `
 
 ## 파일이 깨졌을 때
 
-게시판 파일(`file`)을 못 열어도 `BoardService` 생성자는 던지지 않는다 — 호스트 서버는 그대로 뜨고 게시판 길만 503 `BOARD_UNAVAILABLE`, `GET config` 의 `unavailable {since, message}` 로 화면이 "열 수 없습니다 + [다시 시도]" 를 그린다. 운영자가 파일을 고치면 `POST retry` 또는 `retryMs`(기본 60초)마다 저절로 다시 연다. 붙인 직후 `quick_check`, `synchronous = FULL`, 새 마이그레이션 전 `<file>.pre-migrate` 복사. 사건 `unavailable` · `recovered`(actor `system`)를 `onEvent` 로 보낸다 — 호스트는 로그 · 경보로.
+게시판 파일(`file`)을 못 열어도 `BoardService` 생성자는 던지지 않는다 — 호스트 서버는 그대로 뜨고 게시판 길만 503 `BOARD_UNAVAILABLE`, `GET config` 의 `unavailable {since, message}` 로 화면이 "열 수 없습니다 + [다시 시도]" 를 그린다. 운영자가 파일을 고치면 `POST retry` 또는 `retryMs`(기본 60초)마다 저절로 다시 연다. 붙인 직후 `quick_check`, `synchronous = FULL`, 새 마이그레이션 전 `<file>.pre-migrate` 복사. 운영자의 [새로 시작](`POST reset`, 고장 상태에서만)은 깨진 파일 · 첨부 폴더를 `<이름>.broken-<시각>` 으로 옮기고 빈 게시판으로 — 지우지 않는다. 사건 `unavailable` · `recovered`(actor `system`) · `reset {movedTo}` 를 `onEvent` 로 보낸다 — 호스트는 로그 · 경보 · 감사로.
 
 ## 구조
 ```

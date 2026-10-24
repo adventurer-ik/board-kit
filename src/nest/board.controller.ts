@@ -55,6 +55,18 @@ export class BoardControllerBase {
     return this.svc.config(a);
   }
 
+  /** [새로 시작] — 운영자. 고장 상태에서만: 깨진 파일 · 첨부 폴더를 옆으로 옮기고 빈 게시판으로 */
+  @Post('reset')
+  @HttpCode(200)
+  reset(@Req() req: Request) {
+    this.svc.assertEnabled();
+    const a = this.host.actor(req);
+    if (!a) throw new BoardError('BOARD_UNAUTHORIZED');
+    if (!a.moderator) throw new BoardError('BOARD_FORBIDDEN');
+    const r = this.svc.startFresh(a);
+    return { ...this.svc.config(a), movedTo: r.movedTo };
+  }
+
   @Get('posts')
   list(@Req() req: Request, @Query() q: Record<string, string | undefined>) {
     this.actor(req);

@@ -28,7 +28,9 @@ export type BoardEventType =
   /** 게시판 파일을 못 열었다(actor 는 'system', detail.file · detail.message) — 호스트는 로그 · 경보로 */
   | 'unavailable'
   /** 고친 뒤 되살아났다 */
-  | 'recovered';
+  | 'recovered'
+  /** 운영자가 [새로 시작] — 깨진 파일 · 첨부 폴더를 옆으로 옮기고(detail.movedTo) 빈 게시판으로. 호스트는 감사 로그로 */
+  | 'reset';
 
 export interface BoardEvent {
   type: BoardEventType;
