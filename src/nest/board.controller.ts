@@ -7,7 +7,7 @@ import type { AttachDisplay, ListQuery } from '../shared/types';
 import { BoardError } from '../core/errors';
 import type { Actor, BoardHost } from '../core/host';
 import { BoardService, LIMITS, type PostInput } from '../core/service';
-import { BoardErrorFilter } from './errors.filter';
+import { BoardErrorFilter, SqliteFaultFilter } from './errors.filter';
 
 export const BOARD_HOST = Symbol('BOARD_HOST');
 
@@ -16,7 +16,7 @@ export const BOARD_HOST = Symbol('BOARD_HOST');
  * 경로 접두어는 호스트가 정하므로 `boardController(prefix)` 가 이 클래스를 상속해 @Controller(prefix) 를 붙인다.
  * 본문 검사는 손으로(의존성 0) — 길이 · 종류만 보고 나머지는 service 가 거른다.
  */
-@UseFilters(BoardErrorFilter)
+@UseFilters(BoardErrorFilter, SqliteFaultFilter)
 export class BoardControllerBase {
   constructor(
     protected readonly svc: BoardService,
@@ -25,6 +25,7 @@ export class BoardControllerBase {
 
   protected actor(req: Request): Actor {
     this.svc.assertEnabled();
+    this.svc.assertAvailable();
     const a = this.host.actor(req);
     if (!a) throw new BoardError('BOARD_UNAUTHORIZED');
     return a;
@@ -38,8 +39,20 @@ export class BoardControllerBase {
 
   @Get('config')
   config(@Req() req: Request) {
-    // 꺼져 있어도 config 는 준다 — 화면이 "꺼짐" 을 그릴 수 있게
+    // 꺼져 있어도 · 파일을 못 열었어도 config 는 준다 — 화면이 "꺼짐" · "사용 불가" 를 그릴 수 있게
     return this.svc.config(this.host.actor(req));
+  }
+
+  /** 파일을 고친 뒤 [다시 시도] — 운영자. 간격을 기다리지 않고 바로 다시 연다 */
+  @Post('retry')
+  @HttpCode(200)
+  retry(@Req() req: Request) {
+    this.svc.assertEnabled();
+    const a = this.host.actor(req);
+    if (!a) throw new BoardError('BOARD_UNAUTHORIZED');
+    if (!a.moderator) throw new BoardError('BOARD_FORBIDDEN');
+    this.svc.recover(true);
+    return this.svc.config(a);
   }
 
   @Get('posts')

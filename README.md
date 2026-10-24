@@ -46,6 +46,10 @@ import { Board, BoardProvider, WriteAboutButton } from 'board-kit/web';
 
 Tailwind 가 이 패키지의 소스를 읽어야 한다 — 호스트 CSS 에 `@source "../../node_modules/board-kit/src/web";` 한 줄. 색은 shadcn 식 토큰(`bg-background` · `text-muted-foreground` · `border` · `bg-primary` …)만 쓴다.
 
+## 파일이 깨졌을 때
+
+게시판 파일(`file`)을 못 열어도 `BoardService` 생성자는 던지지 않는다 — 호스트 서버는 그대로 뜨고 게시판 길만 503 `BOARD_UNAVAILABLE`, `GET config` 의 `unavailable {since, message}` 로 화면이 "열 수 없습니다 + [다시 시도]" 를 그린다. 운영자가 파일을 고치면 `POST retry` 또는 `retryMs`(기본 60초)마다 저절로 다시 연다. 붙인 직후 `quick_check`, `synchronous = FULL`, 새 마이그레이션 전 `<file>.pre-migrate` 복사. 사건 `unavailable` · `recovered`(actor `system`)를 `onEvent` 로 보낸다 — 호스트는 로그 · 경보로.
+
 ## 구조
 ```
 src/shared   서버 · 화면이 같이 쓰는 모양 + 본문 해석(순수 함수)

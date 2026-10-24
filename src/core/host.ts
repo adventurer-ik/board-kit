@@ -24,7 +24,11 @@ export type BoardEventType =
   | 'comment.deleted'
   | 'reaction.changed'
   | 'import.done'
-  | 'wipe';
+  | 'wipe'
+  /** 게시판 파일을 못 열었다(actor 는 'system', detail.file · detail.message) — 호스트는 로그 · 경보로 */
+  | 'unavailable'
+  /** 고친 뒤 되살아났다 */
+  | 'recovered';
 
 export interface BoardEvent {
   type: BoardEventType;
@@ -69,4 +73,6 @@ export interface BoardHost<Req = unknown> {
   onEvent?(e: BoardEvent): void;
   /** 갈래 코드 — 기본 idea · tip · question · bug */
   categories?: Category[];
+  /** 파일을 못 열었을 때 다시 열어 보는 간격(ms, 기본 60초). config 를 물을 때마다 이 간격으로 한 번 — 운영자가 파일을 고치면 재기동 없이 되살아난다 */
+  retryMs?: number;
 }

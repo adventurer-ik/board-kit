@@ -104,6 +104,8 @@ export interface BoardMe {
 
 export interface BoardConfig {
   enabled: boolean;
+  /** 게시판 파일을 못 열어 사용 불가(서버는 정상) — since 부터, message 는 원인. 없으면 null */
+  unavailable?: { since: string; message: string } | null;
   categories: Category[];
   attach: { maxFiles: number; maxBytes: number; kinds: AttachKind[] } | null;
   me: BoardMe | null;

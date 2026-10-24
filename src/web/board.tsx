@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { MessageSquarePlus, Plus } from 'lucide-react';
 import { useState } from 'react';
+import type { BoardConfig } from '../shared/types';
 import { ComposeDialog } from './compose';
 import { useBoard } from './context';
 import { BoardList } from './list';
@@ -23,6 +24,7 @@ export function Board({ postId, onNavigate, header = true, initialContextValue }
   const [composing, setComposing] = useState(false);
 
   if (cfg.data && !cfg.data.enabled) return <div className="rounded-lg border px-4 py-10 text-center text-sm text-muted-foreground">{t('disabled')}</div>;
+  if (cfg.data?.unavailable) return <Unavailable cfg={cfg.data} onRetried={() => cfg.refetch()} />;
   return (
     <div className="flex flex-col gap-4">
       {header && postId === null && (
@@ -43,12 +45,44 @@ export function Board({ postId, onNavigate, header = true, initialContextValue }
   );
 }
 
+/** 파일을 못 열어 사용 불가 — 서버는 정상. 운영자에게는 [다시 시도] */
+function Unavailable({ cfg, onRetried }: { cfg: BoardConfig; onRetried: () => void }) {
+  const { api, t } = useBoard();
+  const [busy, setBusy] = useState(false);
+  const u = cfg.unavailable!;
+  const retry = async () => {
+    setBusy(true);
+    try {
+      await api.retry();
+    } catch {
+      /* 아직 그대로 — 아래 메시지가 갱신된다 */
+    } finally {
+      setBusy(false);
+      onRetried();
+    }
+  };
+  return (
+    <div role="alert" className="flex flex-col items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-10 text-center text-sm">
+      <p className="m-0 font-medium text-destructive">{t('unavailable')}</p>
+      <p className="m-0 max-w-prose text-muted-foreground">{t('unavailableHint')}</p>
+      <p className="m-0 max-w-prose break-all font-mono text-xs text-muted-foreground">
+        {t('unavailableSince', { since: u.since })} · {u.message}
+      </p>
+      {cfg.me?.moderator && (
+        <Button variant="outline" onClick={retry} disabled={busy}>
+          {t('retry')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** 화면 머리의 말풍선 — 어느 화면에서든 "이 화면에 대해 적기". 글이 만들어지면 onCreated 로 그 글로 */
 export function WriteAboutButton({ onCreated, className, context }: { onCreated?: (id: number) => void; className?: string; context?: Record<string, unknown> }) {
   const { api, t } = useBoard();
   const cfg = useQuery({ queryKey: ['board', 'config'], queryFn: api.config });
   const [open, setOpen] = useState(false);
-  if (!cfg.data?.enabled) return null;
+  if (!cfg.data?.enabled || cfg.data.unavailable) return null;
   return (
     <>
       <Button variant="outline" size="icon" className={className} aria-label={t('writeAbout')} title={t('writeAbout')} onClick={() => setOpen(true)}>

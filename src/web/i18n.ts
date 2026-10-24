@@ -8,6 +8,10 @@ export const ko = {
   write: '글 쓰기',
   writeAbout: '이 화면에 대해 적기',
   disabled: '게시판이 꺼져 있습니다.',
+  unavailable: '게시판을 열 수 없습니다.',
+  unavailableHint: '게시판 파일에 문제가 있습니다. 다른 기능은 그대로 쓸 수 있습니다. 운영자가 파일을 고치거나 백업에서 되돌린 뒤 [다시 시도].',
+  unavailableSince: '{since} 부터',
+  retry: '다시 시도',
   all: '전체',
   cat_idea: '제안',
   cat_tip: '경험',
@@ -86,6 +90,8 @@ export const ko = {
   e_BOARD_ATTACH_TOO_BIG: '파일이 너무 큽니다.',
   e_BOARD_ATTACH_KIND: '받지 않는 종류의 파일입니다.',
   e_BOARD_IMPORT_FORMAT: '가져올 파일 형식이 아닙니다.',
+  e_BOARD_UNAVAILABLE: '게시판을 열 수 없습니다.',
+  e_BOARD_INTERNAL: '게시판 내부 오류입니다.',
   e_unknown: '처리하지 못했습니다.',
 };
 
@@ -98,6 +104,10 @@ export const en: Dict = {
   write: 'New post',
   writeAbout: 'Write about this screen',
   disabled: 'The board is turned off.',
+  unavailable: 'The board cannot be opened.',
+  unavailableHint: 'There is a problem with the board file. Everything else keeps working. Once the file is fixed or restored from a backup, press Retry.',
+  unavailableSince: 'since {since}',
+  retry: 'Retry',
   all: 'All',
   cat_idea: 'Idea',
   cat_tip: 'Tip',
@@ -175,6 +185,8 @@ export const en: Dict = {
   e_BOARD_ATTACH_TOO_BIG: 'File is too large.',
   e_BOARD_ATTACH_KIND: 'This kind of file is not accepted.',
   e_BOARD_IMPORT_FORMAT: 'Not a board export file.',
+  e_BOARD_UNAVAILABLE: 'The board cannot be opened.',
+  e_BOARD_INTERNAL: 'Board internal error.',
   e_unknown: 'Something went wrong.',
 };
 

@@ -11,7 +11,9 @@ export type BoardErrorCode =
   | 'BOARD_ATTACH_TOO_MANY'
   | 'BOARD_ATTACH_TOO_BIG'
   | 'BOARD_ATTACH_KIND'
-  | 'BOARD_IMPORT_FORMAT';
+  | 'BOARD_IMPORT_FORMAT'
+  | 'BOARD_UNAVAILABLE'
+  | 'BOARD_INTERNAL';
 
 const STATUS: Record<BoardErrorCode, number> = {
   BOARD_DISABLED: 403,
@@ -24,6 +26,10 @@ const STATUS: Record<BoardErrorCode, number> = {
   BOARD_ATTACH_TOO_BIG: 413,
   BOARD_ATTACH_KIND: 415,
   BOARD_IMPORT_FORMAT: 400,
+  /** 게시판 파일을 못 열었다(손상 · 권한) — 서버는 멀쩡, 게시판만. 고치면 되살아난다 */
+  BOARD_UNAVAILABLE: 503,
+  /** 게시판 안의 다른 DB 오류 */
+  BOARD_INTERNAL: 500,
 };
 
 export class BoardError extends Error {

@@ -13,6 +13,9 @@ import { type AttachmentRow, BoardRepo, type CommentRow, type PostRow } from './
 import { EXT, MIME } from './sniff';
 import { now } from './time';
 
+/** 사건의 주체가 사람이 아닐 때(파일 고장 · 되살아남) */
+const SYSTEM: Actor = { name: 'system', moderator: true };
+
 export const LIMITS = { title: 200, body: 20_000, comment: 5_000, page: 50, pageMax: 200 } as const;
 
 export interface PostInput {
@@ -32,11 +35,37 @@ export class BoardService {
   readonly store: AttachStore | null;
   readonly categories: readonly Category[];
 
+  /**
+   * 게시판 파일을 못 열었을 때(손상 · 권한 · 디스크) — 호스트 서버는 그대로 뜨고 게시판만 사용 불가(BOARD_UNAVAILABLE 503).
+   * 운영자가 파일을 고치거나 옆으로 옮기면 recover() 가 다시 열어 되살린다(config 를 물을 때 retryMs 마다, 또는 [다시 시도]).
+   */
+  private fault: { since: string; message: string } | null = null;
+  private lastRetry = 0;
+  private readonly retryMs: number;
+
   constructor(private readonly host: BoardHost) {
-    attachAndMigrate(host.db, host.file);
+    this.retryMs = host.retryMs ?? 60_000;
     this.repo = new BoardRepo(host.db);
     this.store = host.attach ? new AttachStore(host.attach.dir) : null;
     this.categories = host.categories?.length ? host.categories : DEFAULT_CATEGORIES;
+    this.open();
+  }
+
+  /** 파일 붙이기 · 마이그레이션 — 실패해도 던지지 않고 fault 에 적는다(생성자가 터지면 호스트의 DI 전체가 멈춘다) */
+  private open(): void {
+    try {
+      attachAndMigrate(this.host.db, this.host.file);
+      if (this.fault) {
+        this.fault = null;
+        this.emit('recovered', SYSTEM, { detail: { file: this.host.file } });
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      const first = !this.fault;
+      this.fault = { since: this.fault?.since ?? now(), message };
+      this.lastRetry = Date.now(); // 방금 실패했으니 간격만큼은 다시 열어 보지 않는다
+      if (first) this.emit('unavailable', SYSTEM, { detail: { file: this.host.file, message } });
+    }
   }
 
   // ── 문 ──
@@ -45,10 +74,46 @@ export class BoardService {
     if (!this.host.enabled()) throw new BoardError('BOARD_DISABLED');
   }
 
+  /** 파일을 못 연 상태면 503 — 그 전에 간격이 지났으면 한 번 다시 열어 본다 */
+  assertAvailable(): void {
+    if (this.fault && !this.recover()) throw new BoardError('BOARD_UNAVAILABLE', { since: this.fault.since, message: this.fault.message });
+  }
+
+  /** 다시 열어 본다 — force 가 아니면 retryMs 마다 한 번. 되살아났으면 true */
+  recover(force = false): boolean {
+    if (!this.fault) return true;
+    const t = Date.now();
+    if (!force && t - this.lastRetry < this.retryMs) return false;
+    this.lastRetry = t;
+    this.open();
+    return !this.fault;
+  }
+
+  /** 요청 중에 SQLite 가 손상을 알리면(SQLITE_CORRUPT · NOTADB) 사용 불가로 바꾼다 — 다음 요청부터 503, 간격마다 다시 열어 본다 */
+  markFault(message: string): void {
+    if (!this.fault) {
+      this.fault = { since: now(), message };
+      this.lastRetry = Date.now();
+      try {
+        this.host.db.exec('DETACH DATABASE board');
+      } catch {
+        /* 떼지 못하면 다음 open 이 그대로 다시 쓴다 */
+      }
+      this.emit('unavailable', SYSTEM, { detail: { file: this.host.file, message } });
+    }
+  }
+
+  /** 호스트의 상태 화면 · 점검 명령용 */
+  status(): { ok: boolean; file: string; fault: { since: string; message: string } | null } {
+    return { ok: !this.fault, file: this.host.file, fault: this.fault };
+  }
+
   config(actor: Actor | null): BoardConfig {
+    if (this.fault) this.recover();
     const a = this.host.attach;
     return {
       enabled: this.host.enabled(),
+      unavailable: this.fault,
       categories: [...this.categories],
       attach: a ? { maxFiles: a.maxFiles, maxBytes: a.maxBytes, kinds: [...a.kinds] } : null,
       me: actor ? { name: actor.name, moderator: actor.moderator } : null,
@@ -307,6 +372,7 @@ export class BoardService {
   }
 
   wipe(actor: Actor): void {
+    this.assertAvailable();
     const rows = this.store ? (this.host.db.prepare(`SELECT DISTINCT path FROM board.attachment`).all() as { path: string }[]) : [];
     this.repo.wipe();
     for (const r of rows) this.store!.remove(r.path);
