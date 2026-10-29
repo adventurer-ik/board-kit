@@ -131,10 +131,11 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
   });
 
   return (
-    <section className="flex flex-col gap-3 border-t pt-5">
+    // 댓글은 본문과 다른 바탕(옅은 회색 판) 위 흰 카드로 — 본문 · 댓글 · 쓰기 칸이 한눈에 갈린다. 글쓴이 댓글은 왼쪽 선
+    <section className="flex flex-col gap-3 rounded-xl border bg-muted/50 p-4 sm:p-5">
       <h2 className="m-0 text-base font-semibold">{t('comments', { n: items.length })}</h2>
-      {items.map((c, i) => (
-        <div key={c.id} className={cn('flex flex-col gap-1.5 rounded-lg border px-3.5 py-3', i % 2 === 1 && 'bg-muted/30')}>
+      {items.map((c) => (
+        <div key={c.id} className={cn('flex flex-col gap-1.5 rounded-lg border bg-card px-4 py-3 shadow-xs', c.author === postAuthor && 'border-l-2 border-l-primary/50')}>
           <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
             <span className="font-semibold text-foreground">{c.author}</span>
             {c.author === postAuthor && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">{t('author')}</span>}
@@ -181,7 +182,7 @@ function Comments({ postId, postAuthor, items, onChanged }: { postId: number; po
           )}
         </div>
       ))}
-      <div className="mt-1 flex flex-col gap-2">
+      <div className="mt-1 flex flex-col gap-2 border-t pt-4">
         <div className="flex items-center justify-between gap-2">
           <Label htmlFor="bk-comment">{t('commentWrite')}</Label>
           <CodeInsert textarea={commentRef} value={body} onChange={setBody} />
